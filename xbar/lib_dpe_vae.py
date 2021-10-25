@@ -1,6 +1,6 @@
 import sys
 sys.path.append('..')
-from dpe import DPE
+from lib_dpe_utils import DPE
 import numpy as np
 
 def vec_pn(Vec):

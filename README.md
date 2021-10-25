@@ -1,1 +1,1 @@
-# Machine Learning framwork based on Crossbar array
+# Machine Learning framework based on Crossbar arrays

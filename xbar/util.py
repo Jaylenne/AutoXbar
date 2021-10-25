@@ -3,7 +3,7 @@ import numpy as np
 
 def Xbar_tile_aggre(v, g, r_size=64, c_size=64, **kwargs):
     """
-    v: vector to be multiply, should be transposed to adapt to dpe [r, c_v]
+    v: vector to be multiply, should be transposed to adapt to lib_dpe_utils [r, c_v]
     g: conductance map [r, c_g]
     output: [c_v, c_g]
     """
