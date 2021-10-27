@@ -1,7 +1,7 @@
 """DPE utils for controlling writing, reading and vector-matrix-multiplication (VMM)"""
 import numpy as np
 
-from ..xbarlayers import Xbar_tile_aggre
+from ..utils import Xbar_tile_aggre
 
 
 def Vec_pn(vec):
@@ -156,7 +156,7 @@ def vec_mm(dpe, array, vec, geff, start_pos, lincor=True, **kwargs):
     return output, gmap[start_pos[0]:start_pos[0] + geff.shape[0], start_pos[1]:start_pos[1] + geff.shape[1]]
 
 
-def xbar_mm(dpe, X, trgGmap, array, position):
+def xbar_mm(dpe, X, trgGmap, array, position, **kwargs):
     """
 
     :param dpe: DPE class for superT platform
@@ -175,7 +175,7 @@ def xbar_mm(dpe, X, trgGmap, array, position):
     """
     assert len(array) == len(position), "Array index should be specified wrt. each position"
     r_x, c_x = X.shape
-    r_g, c_g = trgGmap
+    r_g, c_g = trgGmap.shape
     assert r_x == r_g, "First dimension doesn't match"
     # split into tiled arrays
     v_eff, g_eff, n_r, n_c = Xbar_tile_aggre(X, trgGmap)
@@ -186,7 +186,8 @@ def xbar_mm(dpe, X, trgGmap, array, position):
     for i in range(n_r):
         r_out = []
         for j in range(n_c):
-            output, gmap = vec_mm(dpe, array[i * n_c + j], v_eff[f'v{i}'], g_eff[f'g{i}_{j}'], position[i * n_c + j])
+            output, gmap = vec_mm(dpe, array[i * n_c + j], v_eff[f'v{i}'], g_eff[f'g{i}_{j}'], position[i * n_c + j],
+                                  **kwargs)
             Gmap[i * 64:i * 64 + gmap.shape[0], j * 64:j * 64 + gmap.shape[1]] = gmap
             r_out.append(output)
         Y.append(np.concatenate(r_out, axis=-1))

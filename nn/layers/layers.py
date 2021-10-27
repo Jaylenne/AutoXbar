@@ -140,7 +140,16 @@ class Flatten(FunctionBase):
 #########################################################
 #                  Neural Network Layers                #
 #########################################################
-class Linear()
+class Linear(LayerBase):
+    def __init__(self,
+                 in_dim,
+                 out_dim,
+                 mode='classic',
+                 **kwargs):
+
+    super().__init__()
+
+    def
 
 
 

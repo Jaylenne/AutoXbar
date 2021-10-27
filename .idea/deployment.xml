@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" serverName="maorb@147.8.128.137:6001" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="maorb@147.8.128.137:6001">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/maorb/pycharm_remote/AutoXbar" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>

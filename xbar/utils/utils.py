@@ -23,8 +23,8 @@ def Norm(X, order=np.inf, axis=None):
     # For inf norm for matrix, return the maximum abs number in the matrix
     if order == np.inf and axis is None:
         norm = np.linalg.norm(X, ord=order, axis=0, keepdims=True)
-        norm = np.linalg.norm(norm, ord=order, axis=axis, keepdims=True)
-        assert norm == X.max(), "Inf norm of a matrix should return the maximum value in the matrix"
+        norm = np.linalg.norm(norm, ord=order, axis=1, keepdims=True)
+        assert norm.item() == abs(X).max(), "Inf norm of a matrix should return the maximum value in the matrix"
     X_norm = X / norm
 
     return X_norm, norm
@@ -143,8 +143,6 @@ def acm(W, w_g_ratio, normalize=False, **kwargs):
     return trgGmap * w_g_ratio, 1.
 
 
-
-
 #########################################################
 #          Splitting matrix into tiled arrays           #
 #########################################################
@@ -162,8 +160,8 @@ def Xbar_tile_aggre(v, g, r_size=64, c_size=64):
         v = np.expand_dims(v, 0)
 
     assert v.shape[0] == g.shape[0], "the dimension doesn't match!"
-    n_r = np.ceil(g.shape[0] / r_size)  # number of tiled arrays in rows
-    n_c = np.ceil(g.shape[1] / c_size)  # number of tiled arrays in columns
+    n_r = np.ceil(g.shape[0] / r_size).astype(int)  # number of tiled arrays in rows
+    n_c = np.ceil(g.shape[1] / c_size).astype(int)  # number of tiled arrays in columns
 
     dict_vec = {}
     dict_gmap = {}
@@ -189,3 +187,9 @@ def Xbar_tile_aggre(v, g, r_size=64, c_size=64):
                     dict_gmap[f'g{i}_{j}'] = g[i * r_size:(i + 1) * r_size, j * c_size:(j + 1) * c_size]
 
     return dict_vec, dict_gmap, n_r, n_c
+
+
+if __name__ == "__main__":
+    a = np.random.randn(3, 3)
+    print(Norm(a))
+    print(a)

@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-import utils
+from .. import utils
 from ..lib_dpe_utils import xbar_mm
 from ...nn import ops
 
@@ -93,10 +93,12 @@ class Linear(XbarLayer):
                          output of linear layer, shouldn't remove all the normalization operation for ourput
         """
         self._get_exp_param(**kwargs)
-        Y, Gmap = xbar_mm(dpe, self.input, self.trgGmap, array, position)
+        Y, Gmap = xbar_mm(dpe, self.input, self.trgGmap, array, position, **kwargs)
 
         self.Gmap["Gmap"] = Gmap
         self.current["current"] = Y
+
+        Y = Y[:, ::2] - Y[:, 1::2]
 
         output = Y * self.w_norm * self.x_norm.T / self.w_g_ratio
 
@@ -145,11 +147,11 @@ class conv2D(XbarLayer):
         self.out_cols = (in_cols + pc1 + pc2 - fc) // s + 1
 
         if bias is None:
-            self.W = weight.reshape(out_ch, -1).T  # (fr * fc * in_ch, out_ch)
+            self.W = weight.reshape(self.out_ch, -1).T  # (fr * fc * in_ch, out_ch)
             self.X = ops.im2col(X, weight.shape, pad, stride)  # (fr * fc * in_ch, n_ex * out_rows * out_cols)
         else:
             # (fr * fc * in_ch + 1, out_ch)
-            self.W = np.append(weight.reshape(out_ch, -1), bias, axis=1).T
+            self.W = np.append(weight.reshape(self.out_ch, -1), bias, axis=1).T
             # (fr * fc * in_ch + 1, n_ex * out_rows * out_cols)
             self.X = np.insert(ops.im2col(X, weight.shape, pad, stride), fr * fc * in_ch, 1, axis=0)
 
@@ -177,10 +179,12 @@ class conv2D(XbarLayer):
                          output of linear layer, shouldn't remove all the normalization operation for ourput
         """
         self._get_exp_param(**kwargs)
-        Y, Gmap = xbar_mm(dpe, self.input, self.trgGmap, array, position)
+        Y, Gmap = xbar_mm(dpe, self.input, self.trgGmap, array, position, **kwargs)
 
         self.Gmap["Gmap"] = Gmap
         self.current["current"] = Y
+
+        Y = Y[:, ::2] - Y[:, 1::2]
 
         output = Y * self.w_norm * self.x_norm.T / self.w_g_ratio  # (n_ex * out_rows * out_cols, out_ch)
         output = output.reshape(self.out_rows, self.out_cols, self.n_ex, self.out_ch).transpose(2, 3, 0, 1)
