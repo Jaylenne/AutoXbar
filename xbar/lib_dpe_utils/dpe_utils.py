@@ -51,7 +51,7 @@ def dpe_pn(dpe, Vec, array, c_sel, **kwargs):
     return Ires
 
 
-def vec_mm(dpe, array, vec, geff, start_pos, lincor=True, **kwargs):
+def vec_mm(dpe, array, vec, geff, start_pos, **kwargs):
     """
     program conductance and do the matrix multiplications
     :param dpe: DPE class for superT platform
@@ -68,7 +68,7 @@ def vec_mm(dpe, array, vec, geff, start_pos, lincor=True, **kwargs):
             gmap: the according conductance map of geff
     """
     vSetRamp = kwargs['vSetRamp'] if 'vSetRamp' in kwargs.keys() else [1.0, 2.5, 0.1]
-    vGateSetRamp = kwargs['vGateSetRamp'] if 'vGateSetRamp' in kwargs.keys() else [1.0, 2.0, 0.1]
+    vGateSetRamp = kwargs['vGateSetRamp'] if 'vGateSetRamp' in kwargs.keys() else [0.95, 2.0, 0.05]
     vResetRamp = kwargs['vResetRamp'] if 'vResetRamp' in kwargs.keys() else [0.5, 3.5, 0.05]
     vGateResetRamp = kwargs['vGateResetRamp'] if 'vGateResetRamp' in kwargs.keys() else [5.0, 5.5, 0.1]
 
@@ -92,6 +92,8 @@ def vec_mm(dpe, array, vec, geff, start_pos, lincor=True, **kwargs):
 
     Vread = kwargs['Vread'] if 'Vread' in kwargs.keys() else 0.2
     tdly = kwargs['tdly'] if 'tdly' in kwargs.keys() else 500
+
+    lincor = kwargs['lincor'] if 'lincor' in kwargs.keys() else True
 
     assert vec.shape[0] == geff.shape[0], "dimension doesn't match!"
     assert geff.shape[0] + start_pos[0] <= 64, "mapping exceed number of rows!"
@@ -151,7 +153,8 @@ def vec_mm(dpe, array, vec, geff, start_pos, lincor=True, **kwargs):
         output = dpe.multiply(array, xbarinput, c_sel=[start_pos[1], start_pos[1] + geff.shape[1]], r_start=0, mode=0,
                               Tdly=tdly)
 
-    output = dpe.lin_corr(output, lin_corr)
+    if lincor:
+        output = dpe.lin_corr(output, lin_corr)
 
     return output, gmap[start_pos[0]:start_pos[0] + geff.shape[0], start_pos[1]:start_pos[1] + geff.shape[1]]
 
