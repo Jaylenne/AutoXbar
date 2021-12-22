@@ -59,9 +59,9 @@ class xbar:
             Gmap = np.concatenate(
                 [
                     np.concatenate(
-                        [dict_gmap[f'g{i}_{j}'] for i in range(n_r)]
+                        [dict_gmap[f'g{i}_{j}'] for i in range(n_r)], axis=0
                     ) for j in range(n_c)
-                ]
+                ], axis=1
             )
         return Gmap
 
@@ -118,7 +118,7 @@ def add_program_noise(Ginit, a=15., b=5., g1=20., g2=80., piecewise=True):
     assert Ginit.max() < 200, "Conductance range exceed"
 
     Gmap = np.zeros_like(Ginit)
-    Gmap = np.abs(Gmap + np.random.randn(*Ginit.shape) * a)
+    Gmap = np.abs(Ginit + np.random.randn(*Ginit.shape) * a)
     if piecewise:
         idx = np.where((Ginit < g1) | (Ginit > g2))
         G = Ginit[idx]

@@ -66,6 +66,8 @@ class Linear(XbarLayer):
             self.W = weight  # (in_dim, out_dim)
             self.X = X  # (n_ex, in_dim)
         else:
+            if bias.ndim == 1:
+                bias = bias[None, :]
             self.W = np.append(weight, bias, axis=0)  # (in_dim + 1, out_dim)
             self.X = np.append(X, np.ones((X.shape[0], 1)), axis=1)  # (n_ex, in_dim + 1)
 
@@ -151,6 +153,8 @@ class conv2D(XbarLayer):
             self.X = ops.im2col(X, weight.shape, pad, stride)  # (fr * fc * in_ch, n_ex * out_rows * out_cols)
         else:
             # (fr * fc * in_ch + 1, out_ch)
+            if bias.ndim == 1:
+                bias = bias[:, None]
             self.W = np.append(weight.reshape(self.out_ch, -1), bias, axis=1).T
             # (fr * fc * in_ch + 1, n_ex * out_rows * out_cols)
             self.X = np.insert(ops.im2col(X, weight.shape, pad, stride), fr * fc * in_ch, 1, axis=0)

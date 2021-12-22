@@ -34,7 +34,7 @@ def Norm(X, order=np.inf, axis=None):
 #             Conductance mapping strategy              #
 #########################################################
 
-def dp_sparse(W, w_g_ratio, normalize=False, **kwargs):
+def dp_sparse(W, w_g_ratio, **kwargs):
     """
     Sparse differential pair method for weight mapping, half of the memrsitor is set to zeros.
     W is not normalized
@@ -48,6 +48,7 @@ def dp_sparse(W, w_g_ratio, normalize=False, **kwargs):
             trgGmap: <np.ndarray> of shape (w_rows, 2 * w_cols)
                      Conductance map of weight W
     """
+    normalize = kwargs.get('normalize', False)
     w_rows, w_cols = W.shape
     trgGmap = np.zeros((w_rows, 2 * w_cols))
 
@@ -70,7 +71,7 @@ def dp_sparse(W, w_g_ratio, normalize=False, **kwargs):
     return trgGmap * w_g_ratio, 1.
 
 
-def dp_dense(W, w_g_ratio, normalize=False, **kwargs):
+def dp_dense(W, w_g_ratio, **kwargs):
     """
     Dense differential pair method for weight mapping.
     Left column: (w_offset + w) / 2; Right column: (w_offset - w) / 2; maximum value of the transferred weight.
@@ -86,6 +87,7 @@ def dp_dense(W, w_g_ratio, normalize=False, **kwargs):
     """
     # Set the w_offset to be the maximum abs value in matrix to ensure all transferred weights are bigger than zero
     # You can set different w_offset to fit in the crossbar dynamic range even <np.ndarray>
+    normalize = kwargs.get('normalize', False)
     w_offset = kwargs.get("w_offset", abs(W).max())
     w_rows, w_cols = W.shape
     trgGmap = np.zeros((w_rows, 2 * w_cols))
@@ -104,7 +106,7 @@ def dp_dense(W, w_g_ratio, normalize=False, **kwargs):
     return trgGmap * w_g_ratio, 1.
 
 
-def acm(W, w_g_ratio, normalize=False, **kwargs):
+def acm(W, w_g_ratio, **kwargs):
     """
     Adjacent column method for weight mapping, don't need to be normalized out of the function
     _______________________________________
@@ -122,6 +124,7 @@ def acm(W, w_g_ratio, normalize=False, **kwargs):
                      Conductance map of weight W
             norm: <np.ndarray> of shape (1, w_rows)
     """
+    normalize = kwargs.get('normalize', False)
     w_rows, w_cols = W.shape
     trgGmap = np.zeros((w_rows, w_cols + 1))
 
