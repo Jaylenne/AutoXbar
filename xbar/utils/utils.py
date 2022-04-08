@@ -146,6 +146,24 @@ def acm(W, w_g_ratio, **kwargs):
     return trgGmap * w_g_ratio, 1.
 
 
+def directmapping(W, w_g_ratio, **kwargs):
+    """
+    Direct mapping the W to trgGmap without during any encoding
+    """
+    normalize = kwargs.get('normalize', False)
+    w_rows, w_cols = W.shape
+    trgGmap = np.zeros((w_rows, w_cols))
+    trgGmap = W
+
+    if normalize:
+        order = kwargs.get("order", np.inf)
+        axis = kwargs.get("axis", None)
+        trgGmap, norm = Norm(trgGmap, order, axis)
+        return trgGmap * w_g_ratio, norm
+
+    return trgGmap * w_g_ratio, 1.
+
+
 #########################################################
 #          Splitting matrix into tiled arrays           #
 #########################################################
@@ -192,7 +210,84 @@ def Xbar_tile_aggre(v, g, r_size=64, c_size=64):
     return dict_vec, dict_gmap, n_r, n_c
 
 
+def adaptmapping(dict_gmap, n_r, n_c, array=[0]):
+    """
+    Group the splitted gmap into several dense 64x64 array and specific the number
+    of arrays to be programmed and the grouped gmap, when one dimension is significantly
+    smaller than 64
+
+    TODO: Add the position
+    """
+    assert n_r == 1 or n_c == 1, "We don't need adapt mapping since most split arrays are 64x64!"
+    if n_r == 1:
+        assert dict_gmap['g0_0'].shape[0] <= 32, "We don't need adapt mapping since we can't merge!"
+    if n_c == 1:
+        assert dict_gmap['g0_0'].shape[1] <= 32, "We don't need adapt mapping since we can't merge!"
+    
+    gmap_total = []
+    pos_total = []
+    num_blocks = []
+    array_total = []
+    Msel_total = []
+    if n_r == 1:
+        dim_r = dict_gmap[f'g0_0'].shape[0]
+        nr_perarray = np.floor(64 / dim_r).astype(int)
+        num_array = np.ceil(n_c / nr_perarray).astype(int)  # number of merged array in total
+        assert num_array == len(array), "The number of array used doesn't match!"
+        for i in range(num_array):
+            gmap = np.zeros((64, 64))
+            Msel = np.zeros((64, 64))
+            pos = []
+            ar = []
+            nr = np.min([nr_perarray, n_c - i * nr_perarray]).astype(int)
+            for j in range(nr):
+                mat = dict_gmap[f'g0_{i*nr_perarray+j}']
+                assert mat.shape[0] == dim_r, "The row dimension doesn't match!"
+                gmap[j*dim_r:(j+1)*dim_r, :mat.shape[1]] = mat
+                Msel[j*dim_r:(j+1)*dim_r, :mat.shape[1]] = np.ones(mat.shape)
+                pos.append((j*dim_r, 0))
+                ar.append(array[i])
+            gmap_total.append(gmap)
+            num_blocks.append(nr)
+            Msel_total.append(Msel)
+            pos_total.append(pos)
+            array_total.append(ar)
+
+        return gmap_total, Msel_total, pos_total, array_total, num_array
+
+    elif n_c == 1:
+        dim_c = dict_gmap[f'g0_0'].shape[1]
+        nc_perarray = np.floor(64 / dim_c).astype(int)
+        num_array = np.ceil(n_r / nc_perarray).astype(int)  # number of merged array in total
+        assert num_array == len(array), "The number of array used doesn't match!"
+        for i in range(num_array):
+            gmap = np.zeros((64, 64))
+            Msel = np.zeros((64, 64))
+            pos = []
+            ar = []
+            nc = np.min([nc_perarray, n_r - i * nc_perarray]).astype(int)
+            for j in range(nc):
+                mat = dict_gmap[f'g{i*nc_perarray+j}_0']
+                assert mat.shape[1] == dim_c, "The column dimension doesn't match!"
+                gmap[:mat.shape[0], j*dim_c:(j+1)*dim_c] = mat
+                Msel[:mat.shape[0], j*dim_c:(j+1)*dim_c] = np.ones(mat.shape)
+                pos.append((0, j*dim_c))
+                ar.append(array[i])
+            gmap_total.append(gmap)
+            num_blocks.append(nc)
+            Msel_total.append(Msel)
+            pos_total.append(pos)
+            array_total.append(ar)
+
+        return gmap_total, Msel_total, pos_total, array_total, num_array, num_blocks
+
+
+
+
+
 if __name__ == "__main__":
-    a = np.random.randn(3, 3)
-    print(Norm(a))
-    print(a)
+    import numpy as np
+    gmap = np.ones((16, 412))
+    dict_vec, dict_gmap, n_r, n_c = Xbar_tile_aggre(np.zeros((16, 100)), gmap, 64, 64)
+    gmap_total, Msel_total, pos_total, array_total, num_array = adaptmapping(dict_gmap, n_r, n_c, array=[0, 1])
+    print(gmap)

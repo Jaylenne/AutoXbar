@@ -1,7 +1,7 @@
 """DPE utils for controlling writing, reading and vector-matrix-multiplication (VMM)"""
 import numpy as np
 
-from ..utils import Xbar_tile_aggre
+from ..utils import Xbar_tile_aggre, adaptmapping
 
 
 def Vec_pn(vec):
@@ -94,23 +94,25 @@ def vec_mm(dpe, array, vec, geff, start_pos, **kwargs):
     tdly = kwargs['tdly'] if 'tdly' in kwargs.keys() else 500
 
     lincor = kwargs['lincor'] if 'lincor' in kwargs.keys() else True
+    program = kwargs['program'] if 'program' in kwargs.keys() else True
 
     assert vec.shape[0] == geff.shape[0], "dimension doesn't match!"
     assert geff.shape[0] + start_pos[0] <= 64, "mapping exceed number of rows!"
     assert geff.shape[1] + start_pos[1] <= 64, "mapping exceed number of columns!"
 
-    # map the geff to 64x64 array
-    stor_vec = np.zeros((64, 64))
-    stor_vec[start_pos[0]:start_pos[0] + geff.shape[0], start_pos[1]:start_pos[1] + geff.shape[1]] = geff
-    # define devices which is within geff that are going to be written
-    Msel = np.zeros((64, 64))
-    # Msel = np.ones((64, 64))
-    Msel[start_pos[0]:start_pos[0] + geff.shape[0], start_pos[1]:start_pos[1] + geff.shape[1]] = 1
+    if program:
+        # map the geff to 64x64 array
+        stor_vec = np.zeros((64, 64))
+        stor_vec[start_pos[0]:start_pos[0] + geff.shape[0], start_pos[1]:start_pos[1] + geff.shape[1]] = geff
+        # define devices which is within geff that are going to be written
+        Msel = np.zeros((64, 64))
+        # Msel = np.ones((64, 64))
+        Msel[start_pos[0]:start_pos[0] + geff.shape[0], start_pos[1]:start_pos[1] + geff.shape[1]] = 1
 
-    dpe.tune_conductance(array, stor_vec, Gtol_in=Gtol_in, Gtol_out=Gtol_out, Msel=Msel, method=method,
-                         maxSteps=maxSteps, Tdly=Tdly, maxRetry=maxRetry, TwidthReset=Twidth, TwidthSet=Twidth,
-                         vSetRamp=vSetRamp, vResetRamp=vResetRamp, vGateSetRamp=vGateSetRamp,
-                         vGateResetRamp=vGateResetRamp)
+        dpe.tune_conductance(array, stor_vec, Gtol_in=Gtol_in, Gtol_out=Gtol_out, Msel=Msel, method=method,
+                            maxSteps=maxSteps, Tdly=Tdly, maxRetry=maxRetry, TwidthReset=Twidth, TwidthSet=Twidth,
+                            vSetRamp=vSetRamp, vResetRamp=vResetRamp, vGateSetRamp=vGateSetRamp,
+                            vGateResetRamp=vGateResetRamp)
 
     # read_conductance
     gmap = dpe.read(array, method=method)
@@ -166,7 +168,7 @@ def xbar_mm(dpe, X, trgGmap, array, position, **kwargs):
     :param array: n-tuple with each int
                   which array wrt. tiled part of matrix
     :param X: <np.ndarray> of shape (r_x, c_x)
-              input vectors, normalized or not normalized
+              input vectors, normalized or not normalized but need to be in [0, 1]
     :param trgGmap: <np.ndarray> of shape (r_g, c_g)
                     target conductance map
     :param position: n-tuple with each (start_row, start_c)
@@ -198,3 +200,89 @@ def xbar_mm(dpe, X, trgGmap, array, position, **kwargs):
     Y = np.array(Y).sum(axis=0)
 
     return Y, Gmap
+
+
+def xbar_adaptmm(dpe, X, trgGmap, array, **kwargs):
+    """
+    perform matrix multiplication per 64x64 array, after programming each 64x64 array
+    You need to predefine the number of array used your self according to the adaptmapping
+    and specify the array you are going to be used.
+
+    : param dpe: DPE class for superT platform
+    : param array: n-list, the number of array specified should be predefined according to the
+        adaptmapping function
+    : param X: <np.ndarray> of shape (r_x, c_x)
+    : param trgGmap: <np.ndarray> of shape (r_g, c_g)
+
+    """
+    vSetRamp = kwargs['vSetRamp'] if 'vSetRamp' in kwargs.keys() else [1.0, 2.5, 0.1]
+    vGateSetRamp = kwargs['vGateSetRamp'] if 'vGateSetRamp' in kwargs.keys() else [0.95, 2.0, 0.05]
+    vResetRamp = kwargs['vResetRamp'] if 'vResetRamp' in kwargs.keys() else [0.5, 3.5, 0.05]
+    vGateResetRamp = kwargs['vGateResetRamp'] if 'vGateResetRamp' in kwargs.keys() else [5.0, 5.5, 0.1]
+
+    maxSteps = kwargs['maxSteps'] if 'maxSteps' in kwargs.keys() else 10
+
+    Gtol = kwargs['Gtol'] if 'Gtol' in kwargs.keys() else 5e-6
+    Gtol_in = kwargs['Gtol_in'] if 'Gtol_in' in kwargs.keys() else Gtol
+    Gtol_out = kwargs['Gtol_out'] if 'Gtol_out' in kwargs.keys() else Gtol
+
+    # Msel = kwargs['Msel'] if 'Msel' in kwargs.keys() else np.ones(self.shape)
+
+    saveHistory = kwargs['saveHistory'] if 'saveHistory' in kwargs.keys() else False
+    maxRetry = kwargs['maxRetry'] if 'maxRetry' in kwargs.keys() else 5
+
+    Tdly = kwargs['Tdly'] if 'Tdly' in kwargs.keys() else 1000
+    method = kwargs['method'] if 'method' in kwargs.keys() else 'slow'
+
+    Twidth = kwargs['Twidth'] if 'Twidth' in kwargs.keys() else 1000e-6
+    TwidthSet = kwargs['TwidthSet'] if 'TwidthSet' in kwargs.keys() else Twidth
+    TwidthReset = kwargs['TwidthReset'] if 'TwidthReset' in kwargs.keys() else Twidth
+
+    Vread = kwargs['Vread'] if 'Vread' in kwargs.keys() else 0.2
+    tdly = kwargs['tdly'] if 'tdly' in kwargs.keys() else 500
+    # assert len(array) == len(position), "Array index should be specified wrt. each position"
+    r_x, c_x = X.shape
+    r_g, c_g = trgGmap.shape
+    assert r_x == r_g, "First dimension doesn't match"
+    # split into tiled arrays
+    v_eff, g_eff, n_r, n_c = Xbar_tile_aggre(X, trgGmap)
+
+    gmap_total, Msel_total, pos_total, array_total, num_array, num_blocks = adaptmapping(g_eff, n_r, n_c, array=array)
+
+    Y = []
+    Gmap = np.zeros_like(trgGmap)
+
+    if n_r == 1:
+        for i in range(num_array):
+            # program each array
+            dpe.tune_conductance(array[i], gmap_total[i], Gtol_in=Gtol_in, Gtol_out=Gtol_out, Msel=Msel_total[i], method=method,
+                         maxSteps=maxSteps, Tdly=Tdly, maxRetry=maxRetry, TwidthReset=Twidth, TwidthSet=Twidth,
+                         vSetRamp=vSetRamp, vResetRamp=vResetRamp, vGateSetRamp=vGateSetRamp,
+                         vGateResetRamp=vGateResetRamp)
+            for j in range(num_blocks[i]):
+                g_mat = g_eff[f'g0_{num_blocks[0]*i+j}']
+                output, gmap = vec_mm(dpe, array[i], v_eff[f'v0'], g_mat, pos_total[i][j], program=False, **kwargs)
+                Gmap[:, 64*num_blocks[0]*i+64*j:64*num_blocks[0]*i+g_mat.shape[1]] = gmap
+                Y.append(output)
+        Y = np.concatenate(Y, axis=-1)
+
+    if n_c == 1:
+        for i in range(num_array):
+            # program each array
+            dpe.tune_conductance(array[i], gmap_total[i], Gtol_in=Gtol_in, Gtol_out=Gtol_out, Msel=Msel_total[i], method=method,
+                         maxSteps=maxSteps, Tdly=Tdly, maxRetry=maxRetry, TwidthReset=Twidth, TwidthSet=Twidth,
+                         vSetRamp=vSetRamp, vResetRamp=vResetRamp, vGateSetRamp=vGateSetRamp,
+                         vGateResetRamp=vGateResetRamp)
+            for j in range(num_blocks[i]):
+                g_mat = g_eff[f'g{num_blocks[0]*i+j}_0']
+                output, gmap = vec_mm(dpe, array[i], v_eff[f'v{num_blocks[0]*i+j}'], g_mat, pos_total[i][j], program=False, **kwargs)
+                Gmap[64*num_blocks[0]*i+64*j:64*num_blocks[0]*i+g_mat.shape[0], :] = gmap
+                Y.append(output)
+        Y = np.array(Y).sum(axis=0)
+    
+    return Y, Gmap
+            
+            
+
+
+

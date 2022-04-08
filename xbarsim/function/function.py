@@ -84,13 +84,13 @@ def conv2D(Xbar, A, B, stride, pad, **kwargs):
 
     if not bias:
         W = B.reshape(out_ch, -1).T  # [fr * fc * in_ch, out_ch]
-        X = ops.im2col(A, B.shape, pad, stride)  # (fr * fc * in_ch, n_ex * out_rows * out_cols)
+        X = ops.im2col(A, B.shape, pad, stride).T  # (n_ex * out_rows * out_cols, fr * fc * in_ch)
 
     if bias is not False:
         if bias.ndim == 1:
             bias = bias[:, None]  # [out_ch, 1]
             W = np.append(B.reshape(out_ch, -1), bias, axis=1).T  # [fr * fc * in_ch + 1, out_ch]
-            # (fr * fc * in_ch + 1, n_ex * out_rows * out_cols)
+            # (n_ex * out_rows * out_cols, fr * fc * in_ch + 1)
             X = np.insert(ops.im2col(A, B.shape, pad, stride), fr * fc * in_ch, 1, axis=0)
 
     # Get input and normalized Conductance Matrix

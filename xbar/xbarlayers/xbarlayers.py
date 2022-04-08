@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from .. import utils
-from ..lib_dpe_utils import xbar_mm
+from ..lib_dpe_utils import xbar_mm, xbar_adaptmm
 from ...nn import ops
 
 
@@ -85,22 +85,30 @@ class Linear(XbarLayer):
                                                                  **kwargs)
         self.input, self.x_norm = utils.Norm(self.X.T, order=np.inf, axis=None)  # inf norm of input vectors
 
-    def forward(self, dpe, array, position, **kwargs):
+    def forward(self, dpe, array, position, adaptmm=False, **kwargs):
         """
         Forward pass of linear layer
         :param dpe: DPE class for superT platform
-        :param array: n-tuple of int
+        :param array: n-tuple of int, if adaptmm array should be the array used for each block
         :param position: n-tuple of 2-tuple
         :return: output: <np.ndarray> of shape (n_ex, out_dim)
                          output of linear layer, shouldn't remove all the normalization operation for ourput
         """
         self._get_exp_param(**kwargs)
-        Y, Gmap = xbar_mm(dpe, self.input, self.trgGmap, array, position, **kwargs)
+        if adaptmm == True:
+            Y, Gmap = xbar_adaptmm(dpe, self.input, self.trgGmap, array, **kwargs)
+        else:
+            Y, Gmap = xbar_mm(dpe, self.input, self.trgGmap, array, position, **kwargs)
 
         self.Gmap["Gmap"] = Gmap
         self.current["current"] = Y
 
-        Y = Y[:, ::2] - Y[:, 1::2]
+        if self.wm_type in ("dp_sparse", "dp_dense"):
+            Y = Y[:, ::2] - Y[:, 1::2]
+        elif self.wm_type == "acm":
+            Y = Y[:, ::-1] - Y[1::]
+        else:
+            Y = Y
 
         output = Y * self.w_norm * self.x_norm.T / self.w_g_ratio
 
@@ -173,7 +181,7 @@ class conv2D(XbarLayer):
                                                                  **kwargs)
         self.input, self.x_norm = utils.Norm(self.X, order=np.inf, axis=None)  # inf norm of input vectors
 
-    def forward(self, dpe, array, position, **kwargs):
+    def forward(self, dpe, array, position, adaptmm=False, **kwargs):
         """
         Forward pass of linear layer
         :param dpe: DPE class for superT platform
@@ -183,12 +191,20 @@ class conv2D(XbarLayer):
                          output of linear layer, shouldn't remove all the normalization operation for ourput
         """
         self._get_exp_param(**kwargs)
-        Y, Gmap = xbar_mm(dpe, self.input, self.trgGmap, array, position, **kwargs)
+        if adaptmm == True:
+            Y, Gmap = xbar_adaptmm(dpe, self.input, self.trgGmap, array, **kwargs)
+        else:
+            Y, Gmap = xbar_mm(dpe, self.input, self.trgGmap, array, position, **kwargs)
 
         self.Gmap["Gmap"] = Gmap
         self.current["current"] = Y
 
-        Y = Y[:, ::2] - Y[:, 1::2]
+        if self.wm_type in ("dp_sparse", "dp_dense"):
+            Y = Y[:, ::2] - Y[:, 1::2]
+        elif self.wm_type == "acm":
+            Y = Y[:, ::-1] - Y[1::]
+        else:
+            Y = Y
 
         output = Y * self.w_norm * self.x_norm.T / self.w_g_ratio  # (n_ex * out_rows * out_cols, out_ch)
         output = output.reshape(self.out_rows, self.out_cols, self.n_ex, self.out_ch).transpose(2, 3, 0, 1)
